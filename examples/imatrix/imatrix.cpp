@@ -271,8 +271,8 @@ void IMatrixCollector::save_imatrix(int ncall) const {
                     LOG_WRN("%s: %d out of %d experts are missing data - storing but be aware\n", __func__, int(bad_experts.size()), kv.second.n_as);
                     store_it = true;
                     for (auto i : bad_experts) {
-                        auto counts = (int *)kv.second.counts.data() + i*n_per_expert;
-                        auto values = (float *)kv.second.values.data() + i*n_per_expert;
+                        auto counts = const_cast<int*>(kv.second.counts.data()) + i * n_per_expert;
+                        auto values = const_cast<float*>(kv.second.values.data()) + i * n_per_expert;
                         for (int j = 0; j < n_per_expert; ++j) {
                             counts[j] = 1;
                             values[j] = 1;
