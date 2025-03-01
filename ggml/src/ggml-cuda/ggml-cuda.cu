@@ -643,9 +643,13 @@ static bool ggml_backend_buft_is_cuda(ggml_backend_buffer_type_t buft) {
 }
 
 static ggml_backend_buffer_t ggml_backend_cuda_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+
     ggml_backend_cuda_buffer_type_context * buft_ctx = (ggml_backend_cuda_buffer_type_context *)buft->context;
 
     ggml_cuda_set_device(buft_ctx->device);
+
+    GGML_LOG_ERROR("%s: Skipping allocating %ld bytes on device %d\n", __func__, size, buft_ctx->device);
+    return nullptr;
 
     void * dev_ptr;
     cudaError_t err = ggml_cuda_device_malloc(&dev_ptr, size, buft_ctx->device);

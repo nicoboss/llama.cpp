@@ -1934,12 +1934,17 @@ static const char * ggml_backend_cpu_buffer_type_get_name(ggml_backend_buffer_ty
 }
 
 static ggml_backend_buffer_t ggml_backend_cpu_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+    GGML_LOG_ERROR("%s: Skip allocateing buffer of size %zu\n", __func__, size);
+    return NULL;
+
     void * data = ggml_aligned_malloc(size);
 
     if (data == NULL) {
         GGML_LOG_ERROR("%s: failed to allocate buffer of size %zu\n", __func__, size);
         return NULL;
     }
+    GGML_LOG_ERROR("%s: failed to allocate buffer of size %zu\n", __func__, size);
+    return NULL;
 
     return ggml_backend_buffer_init(buft, ggml_backend_cpu_buffer_i, data, size);
 }
