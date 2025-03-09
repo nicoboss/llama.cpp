@@ -681,6 +681,13 @@ llama_model_loader::llama_model_loader(
         use_mmap = false;
     }
 
+	if(getenv("DRYRUN")) {
+		if (use_mmap) {
+			LLAMA_LOG_WARN("%s: mmap is not supported for dry-run so it is now disabled\n", __func__);
+			use_mmap = false;
+		}
+	}
+
     this->use_mmap = use_mmap;
     this->check_tensors = check_tensors;
 }
@@ -813,7 +820,7 @@ void llama_model_loader::done_getting_tensors() const {
 }
 
 void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps) {
-    if (use_mmap && false) {
+    if (use_mmap) {
         mappings.reserve(files.size());
         mmaps_used.reserve(files.size());
         for (const auto & file : files) {

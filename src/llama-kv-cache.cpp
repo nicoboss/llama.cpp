@@ -106,8 +106,12 @@ bool llama_kv_cache_init(
 
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
         if (!buf) {
-            LLAMA_LOG_ERROR("%s: failed to allocate buffer for kv cache\n", __func__);
-            return true;
+			if(getenv("DRYRUN")) {
+				LLAMA_LOG_ERROR("%s: pretend allocating buffer for kv cache was successful due to dry-run being enabled\n", __func__);
+				return true;
+			}
+			LLAMA_LOG_ERROR("%s: failed to allocate buffer for kv cache\n", __func__);
+            return false;
         }
         ggml_backend_buffer_clear(buf, 0);
         LLAMA_LOG_INFO("%s: %10s KV buffer size = %8.2f MiB\n", __func__, ggml_backend_buffer_name(buf), ggml_backend_buffer_get_size(buf)/1024.0/1024.0);
