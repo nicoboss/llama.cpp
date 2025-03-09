@@ -647,10 +647,10 @@ static ggml_backend_buffer_t ggml_backend_cuda_buffer_type_alloc_buffer(ggml_bac
 
     ggml_cuda_set_device(buft_ctx->device);
 
-	if(getenv("DRYRUN")) {
-		GGML_LOG_ERROR("[DRYRUN][GPU%d]: %ld\n", buft_ctx->device, size);
-		return nullptr;
-	}
+    if(getenv("DRYRUN")) {
+        GGML_LOG_ERROR("[DRYRUN][GPU%d]: %ld\n", buft_ctx->device, size);
+        return nullptr;
+    }
 
     void * dev_ptr;
     cudaError_t err = ggml_cuda_device_malloc(&dev_ptr, size, buft_ctx->device);

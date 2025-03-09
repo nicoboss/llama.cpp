@@ -3493,13 +3493,13 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
         }
         else {
             ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
-			if (buf == nullptr) {
-				if(getenv("DRYRUN")) {
-					LLAMA_LOG_WARN("%s: pretend allocating %s buffer was successful due to dry-run being enabled\n", __func__, ggml_backend_buft_name(buft));
-				} else {
-					throw std::runtime_error(format("unable to allocate %s buffer", ggml_backend_buft_name(buft)));
-				}
-			}
+            if (buf == nullptr) {
+                if(getenv("DRYRUN")) {
+                    LLAMA_LOG_WARN("%s: pretend allocating %s buffer was successful due to dry-run being enabled\n", __func__, ggml_backend_buft_name(buft));
+                } else {
+                    throw std::runtime_error(format("unable to allocate %s buffer", ggml_backend_buft_name(buft)));
+                }
+            }
             pimpl->bufs.emplace_back(buf);
             if (use_mlock && ggml_backend_buffer_is_host(buf)) {
                 pimpl->mlock_bufs.emplace_back(new llama_mlock);
@@ -3516,13 +3516,13 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
             throw std::runtime_error("failed to allocate buffer");
         }
 
-		if(!getenv("DRYRUN")) {
-			for (auto & buf : buf_map) {
-				// indicate that this buffer contains weights
-				// this is used by ggml_backend_sched to improve op scheduling: ops that use a weight are preferably scheduled to the backend that contains the weight
-				ggml_backend_buffer_set_usage(buf.second, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
-			}
-		}
+        if(!getenv("DRYRUN")) {
+            for (auto & buf : buf_map) {
+                // indicate that this buffer contains weights
+                // this is used by ggml_backend_sched to improve op scheduling: ops that use a weight are preferably scheduled to the backend that contains the weight
+                ggml_backend_buffer_set_usage(buf.second, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+            }
+        }
 
         ctx_bufs.emplace_back(ctx, buf_map);
     }
@@ -3542,11 +3542,11 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
     }
 
     // print memory requirements per buffer type
-	if(!getenv("DRYRUN")) {
-		for (auto & buf : pimpl->bufs) {
-			LLAMA_LOG_INFO("%s: %12s model buffer size = %8.2f MiB\n", __func__, ggml_backend_buffer_name(buf.get()), ggml_backend_buffer_get_size(buf.get()) / 1024.0 / 1024.0);
-		}
-	}
+    if(!getenv("DRYRUN")) {
+        for (auto & buf : pimpl->bufs) {
+            LLAMA_LOG_INFO("%s: %12s model buffer size = %8.2f MiB\n", __func__, ggml_backend_buffer_name(buf.get()), ggml_backend_buffer_get_size(buf.get()) / 1024.0 / 1024.0);
+        }
+    }
 
     // populate tensors_by_name
     for (auto & ctx : pimpl->ctxs) {
@@ -3556,15 +3556,15 @@ bool llama_model::load_tensors(llama_model_loader & ml) {
     }
 
     // load tensor data
-	if(!getenv("DRYRUN")) {
-		for (auto & it : ctx_bufs) {
-			ggml_context * ctx = it.first;
-			auto & bufs = it.second;
-			if (!ml.load_all_data(ctx, bufs, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
-			return false;
-			}
-		}
-	}
+    if(!getenv("DRYRUN")) {
+        for (auto & it : ctx_bufs) {
+            ggml_context * ctx = it.first;
+            auto & bufs = it.second;
+            if (!ml.load_all_data(ctx, bufs, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
+            return false;
+            }
+        }
+    }
 
     if (use_mmap_buffer) {
         for (auto & mapping : ml.mappings) {

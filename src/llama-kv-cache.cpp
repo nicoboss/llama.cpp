@@ -106,11 +106,11 @@ bool llama_kv_cache_init(
 
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
         if (!buf) {
-			if(getenv("DRYRUN")) {
-				LLAMA_LOG_ERROR("%s: pretend allocating buffer for kv cache was successful due to dry-run being enabled\n", __func__);
-				return true;
-			}
-			LLAMA_LOG_ERROR("%s: failed to allocate buffer for kv cache\n", __func__);
+            if(getenv("DRYRUN")) {
+                LLAMA_LOG_ERROR("%s: pretend allocating buffer for kv cache was successful due to dry-run being enabled\n", __func__);
+                return true;
+            }
+            LLAMA_LOG_ERROR("%s: failed to allocate buffer for kv cache\n", __func__);
             return false;
         }
         ggml_backend_buffer_clear(buf, 0);
