@@ -828,12 +828,18 @@ static void ggml_backend_cuda_split_buffer_init_tensor(ggml_backend_buffer_t buf
         // FIXME: do not crash if cudaMalloc fails
         // currently, init_tensor cannot fail, it needs to be fixed in ggml-backend first
         ggml_cuda_set_device(id);
-        char * buf;
-        CUDA_CHECK(ggml_cuda_device_malloc((void**)&buf, size, id));
 
-        // set padding to 0 to avoid possible NaN values
-        if (size > original_size) {
-            CUDA_CHECK(cudaMemset(buf + original_size, 0, size - original_size));
+        char * buf;
+        if(getenv("DRYRUN")) {
+            GGML_LOG_ERROR("[DRYRUN][GPU%d]: %ld\n", id, size);
+            buf = nullptr;
+        } else {
+            CUDA_CHECK(ggml_cuda_device_malloc((void**)&buf, size, id));
+
+            // set padding to 0 to avoid possible NaN values
+            if (size > original_size) {
+                CUDA_CHECK(cudaMemset(buf + original_size, 0, size - original_size));
+            }
         }
 
         extra->data_device[id] = buf;
@@ -1081,6 +1087,10 @@ static void * ggml_cuda_host_malloc(size_t size) {
 }
 
 static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+    if(getenv("DRYRUN")) {
+        GGML_LOG_ERROR("[DRYRUN][PINNED]: %ld\n", size);
+        return nullptr;
+    }
     void * ptr = ggml_cuda_host_malloc(size);
 
     if (ptr == nullptr) {
