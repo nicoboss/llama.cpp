@@ -151,10 +151,6 @@ int main(int argc, char ** argv) {
     ctx = llama_init.context.get();
 
     if (model == NULL) {
-        if(getenv("DRYRUN")) {
-            LOG_ERR("%s: Dryrun compleated!\n", __func__);
-            return 0;
-        }
         LOG_ERR("%s: error: unable to load model\n", __func__);
         return 1;
     }
