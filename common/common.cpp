@@ -950,6 +950,10 @@ struct common_init_result common_init_from_params(common_params & params) {
 
     llama_context * lctx = llama_init_from_model(model, cparams);
     if (lctx == NULL) {
+        if(getenv("DRYRUN")) {
+            LOG_ERR("%s: Dryrun compleated!\n", __func__);
+            exit(0);
+        }
         LOG_ERR("%s: failed to create context with model '%s'\n", __func__, params.model.c_str());
         llama_model_free(model);
         return iparams;
