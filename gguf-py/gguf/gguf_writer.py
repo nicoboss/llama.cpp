@@ -237,6 +237,10 @@ class GGUFWriter:
             kv_bytes = bytearray()
 
             for key, val in kv_data.items():
+                if val.type != GGUFValueType.ARRAY or len (val.value) < 50:
+                    print("gguf serialising key ", key, "value", val)
+                else:
+                    print("gguf serialising key ", key, "value-suppressed")
                 kv_bytes += self._pack_val(key, GGUFValueType.STRING, add_vtype=False)
                 kv_bytes += self._pack_val(val.value, val.type, add_vtype=True)
 
@@ -269,8 +273,8 @@ class GGUFWriter:
         self.state = WriterState.TI_DATA
 
     def add_key_value(self, key: str, val: Any, vtype: GGUFValueType) -> None:
-        if any(key in kv_data for kv_data in self.kv_data):
-            raise ValueError(f'Duplicated key name {key!r}')
+        #if any(key in kv_data for kv_data in self.kv_data):
+        #    raise ValueError(f'Duplicated key name {key!r}')
 
         self.kv_data[0][key] = GGUFValue(value=val, type=vtype)
 
