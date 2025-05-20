@@ -1446,6 +1446,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ));
     add_opt(common_arg(
+        {"--swa-full"},
+        string_format("use full-size SWA cache (default: %s)\n"
+            "[(more info)](https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)", params.swa_full ? "true" : "false"),
+        [](common_params & params) {
+            params.swa_full = true;
+        }
+    ));
+    add_opt(common_arg(
         {"--no-context-shift"},
         string_format("disables context shift on infinite text generation (default: %s)", params.ctx_shift ? "disabled" : "enabled"),
         [](common_params & params) {
@@ -2880,6 +2888,16 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.chat_template = read_file(value);
         }
     ).set_examples({LLAMA_EXAMPLE_MAIN, LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_CHAT_TEMPLATE_FILE"));
+    add_opt(common_arg(
+        {"--no-prefill-assistant"},
+        string_format(
+            "whether to prefill the assistant's response if the last message is an assistant message (default: prefill enabled)\n"
+            "when this flag is set, if the last message is an assistant message then it will be treated as a full message and not prefilled\n"
+        ),
+        [](common_params & params) {
+            params.prefill_assistant = false;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_NO_PREFILL_ASSISTANT"));
     add_opt(common_arg(
         {"-sps", "--slot-prompt-similarity"}, "SIMILARITY",
         string_format("how much the prompt of a request must match the prompt of a slot in order to use that slot (default: %.2f, 0.0 = disabled)\n", params.slot_prompt_similarity),
