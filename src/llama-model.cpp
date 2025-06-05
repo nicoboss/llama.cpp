@@ -5,7 +5,10 @@
 #include "llama-batch.h"
 #include "llama-cparams.h"
 #include "llama-model-loader.h"
-#include "llama-kv-cache.h"
+
+#include "llama-kv-cache-unified.h"
+#include "llama-kv-cache-unified-iswa.h"
+#include "llama-kv-cache-recurrent.h"
 
 #include "ggml-cpp.h"
 
@@ -953,6 +956,11 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                     case 46: type = LLM_TYPE_27B; break;
                     default: type = LLM_TYPE_UNKNOWN;
                }
+
+                // ref: https://github.com/google/gemma_pytorch/blob/014acb7ac4563a5f77c76d7ff98f31b568c16508/gemma/config.py#L173
+                hparams.f_attention_scale = type == LLM_TYPE_27B
+                    ? 1.0f / std::sqrt(float(hparams.n_embd / hparams.n_head(0)))
+                    : 1.0f / std::sqrt(float(hparams.n_embd_head_k));
             } break;
         case LLM_ARCH_GEMMA3:
             {
@@ -973,6 +981,7 @@ void llama_model::load_hparams(llama_model_loader & ml) {
                     default: type = LLM_TYPE_UNKNOWN;
                 }
 
+                // ref: https://github.com/google/gemma_pytorch/blob/014acb7ac4563a5f77c76d7ff98f31b568c16508/gemma/config.py#L289
                 hparams.f_attention_scale = type == LLM_TYPE_27B
                     ? 1.0f / std::sqrt(float(hparams.n_embd / hparams.n_head(0)))
                     : 1.0f / std::sqrt(float(hparams.n_embd_head_k));
@@ -8491,14 +8500,7 @@ struct llm_build_gemma2_iswa : public llm_graph_context {
                 cb(Kcur, "Kcur", il);
                 cb(Vcur, "Vcur", il);
 
-                // ref: https://github.com/google/gemma_pytorch/commit/03e657582d17cb5a8617ebf333c1c16f3694670e
-                switch (model.type) {
-                    case LLM_TYPE_2B:
-                    case LLM_TYPE_9B:
-                    case LLM_TYPE_27B: Qcur = ggml_scale(ctx0, Qcur, 1.0f / sqrtf(float(n_embd_head))); break;
-                    default: GGML_ABORT("fatal error");
-                };
-                cb(Qcur, "Qcur_scaled", il);
+                Qcur = ggml_scale(ctx0, Qcur, hparams.f_attention_scale);
 
                 cur = build_attn(inp_attn, gf,
                         model.layers[il].wo, NULL,
@@ -8639,9 +8641,12 @@ struct llm_build_gemma3_iswa : public llm_graph_context {
                 cb(Kcur, "Kcur", il);
                 cb(Vcur, "Vcur", il);
 
+                // ref: https://github.com/google/gemma_pytorch/blob/014acb7ac4563a5f77c76d7ff98f31b568c16508/gemma/model.py#L315
+                Qcur = ggml_scale(ctx0, Qcur, hparams.f_attention_scale);
+
                 cur = build_attn(inp_attn, gf,
                         model.layers[il].wo, NULL,
-                        Qcur, Kcur, Vcur, nullptr, nullptr, hparams.f_attention_scale, il);
+                        Qcur, Kcur, Vcur, nullptr, nullptr, 1.0f, il);
             }
 
             cur = build_norm(cur,
@@ -8902,9 +8907,9 @@ struct llm_build_mamba : public llm_graph_context {
              ggml_tensor * state_mask,
       const llama_ubatch & ubatch,
                      int   il) const {
-        const llama_kv_cache_recurrent * kv_self = static_cast<const llama_kv_cache_recurrent *>(memory);
+        const auto * kv_state = static_cast<const llama_kv_cache_recurrent_state *>(mstate);
 
-        const auto kv_head = kv_self->head;
+        const auto kv_head = kv_state->get_head();
 
         const int64_t d_conv  = hparams.ssm_d_conv;
         const int64_t d_inner = hparams.ssm_d_inner;
@@ -8922,8 +8927,8 @@ struct llm_build_mamba : public llm_graph_context {
         GGML_ASSERT(ubatch.equal_seqs);
         GGML_ASSERT(ubatch.n_tokens == n_seq_tokens * n_seqs);
 
-        ggml_tensor * conv_states_all = kv_self->k_l[il];
-        ggml_tensor * ssm_states_all  = kv_self->v_l[il];
+        ggml_tensor * conv_states_all = kv_state->get_k_l(il);
+        ggml_tensor * ssm_states_all  = kv_state->get_v_l(il);
 
         // (ab)using the KV cache to store the states
         ggml_tensor * conv = build_copy_mask_state(
@@ -11650,7 +11655,7 @@ struct llm_build_rwkv6_base : public llm_graph_context {
             ggml_tensor * state_mask,
             const llama_ubatch & ubatch,
             int   il) const {
-        const llama_kv_cache_recurrent * kv_self = static_cast<const llama_kv_cache_recurrent *>(memory);
+        const auto * kv_state = static_cast<const llama_kv_cache_recurrent_state *>(mstate);
 
         const auto n_tokens = ubatch.n_tokens;
         const auto n_seqs = ubatch.n_seqs;
@@ -11660,7 +11665,7 @@ struct llm_build_rwkv6_base : public llm_graph_context {
         const auto n_head = n_embd / head_size;
         const auto n_head_kv = hparams.n_head_kv(il);
 
-        const auto kv_head = kv_self->head;
+        const auto kv_head = kv_state->get_head();
 
         const auto & layer = model.layers[il];
 
@@ -11772,7 +11777,7 @@ struct llm_build_rwkv6_base : public llm_graph_context {
         }
 
         ggml_tensor * wkv_state = build_copy_mask_state(
-                gf, kv_self->v_l[il], state_copy, state_mask,
+                gf, kv_state->get_v_l(il), state_copy, state_mask,
                 hparams.n_embd_v_s(), n_seqs);
 
         ggml_tensor * wkv_output;
@@ -11791,9 +11796,9 @@ struct llm_build_rwkv6_base : public llm_graph_context {
                     wkv_state,
                     ggml_view_1d(
                         ctx0,
-                        kv_self->v_l[il],
+                        kv_state->get_v_l(il),
                         hparams.n_embd_v_s() * n_seqs,
-                        hparams.n_embd_v_s() * kv_head * ggml_element_size(kv_self->v_l[il])
+                        hparams.n_embd_v_s() * kv_head * ggml_element_size(kv_state->get_v_l(il))
                         )
                     )
                 );
@@ -12046,7 +12051,7 @@ struct llm_build_rwkv7_base : public llm_graph_context {
             ggml_tensor *& first_layer_value,
             const llama_ubatch & ubatch,
             int   il) const {
-        const llama_kv_cache_recurrent * kv_self = static_cast<const llama_kv_cache_recurrent *>(memory);
+        const auto * kv_state = static_cast<const llama_kv_cache_recurrent_state *>(mstate);
 
         const auto n_tokens = ubatch.n_tokens;
         const auto n_seqs = ubatch.n_seqs;
@@ -12055,7 +12060,7 @@ struct llm_build_rwkv7_base : public llm_graph_context {
         const auto head_count = n_embd / head_size;
         const auto n_seq_tokens = ubatch.n_seq_tokens;
 
-        const auto kv_head = kv_self->head;
+        const auto kv_head = kv_state->get_head();
 
         const auto & layer = model.layers[il];
 
@@ -12126,7 +12131,7 @@ struct llm_build_rwkv7_base : public llm_graph_context {
         a = ggml_reshape_3d(ctx0, a, head_size, head_count, n_tokens);
 
         ggml_tensor * wkv_state = build_copy_mask_state(
-                gf, kv_self->v_l[il], state_copy, state_mask,
+                gf, kv_state->get_v_l(il), state_copy, state_mask,
                 hparams.n_embd_v_s(), n_seqs);
 
         ggml_tensor * wkv_output = ggml_rwkv_wkv7(ctx0, r, w, k, v, ggml_neg(ctx0, kk), ggml_mul(ctx0, kk, a), wkv_state);
@@ -12140,9 +12145,9 @@ struct llm_build_rwkv7_base : public llm_graph_context {
                     wkv_state,
                     ggml_view_1d(
                         ctx0,
-                        kv_self->v_l[il],
+                        kv_state->get_v_l(il),
                         hparams.n_embd_v_s() * n_seqs,
-                        hparams.n_embd_v_s() * kv_head * ggml_element_size(kv_self->v_l[il])
+                        hparams.n_embd_v_s() * kv_head * ggml_element_size(kv_state->get_v_l(il))
                         )
                     )
                 );
@@ -13240,7 +13245,7 @@ llama_memory_i * llama_model::create_memory(const llama_memory_params & params, 
                             params.swa_full,
                             cparams.n_ctx,
                             cparams.n_seq_max,
-                            cparams.n_batch,
+                            cparams.n_ubatch,
                             padding);
                 } else {
                     GGML_ASSERT(!hparams.is_swa_any());
@@ -13601,6 +13606,10 @@ int32_t llama_model_n_head(const llama_model * model) {
 
 int32_t llama_model_n_head_kv(const llama_model * model) {
     return model->hparams.n_head_kv();
+}
+
+int32_t llama_model_n_swa(const llama_model * model) {
+    return model->hparams.n_swa;
 }
 
 // deprecated
