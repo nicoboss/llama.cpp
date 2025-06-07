@@ -846,12 +846,32 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                         // since many people will miss the error and not realize that most of the model is being quantized without an imatrix
                         // tok_embd should be ignored in this case, since it always causes this warning
                         if (name != tn(LLM_TENSOR_TOKEN_EMBD, "weight")) {
-                            throw std::runtime_error(format("imatrix size %d is different from tensor size %d for %s",
-                                    int(it->second.size()), int(tensor->ne[0]*tensor->ne[2]), tensor->name));
+                            LLAMA_LOG_INFO("imatrix size %d is different from tensor size %d for %s", int(it->second.size()), int(tensor->ne[0]*tensor->ne[2]), tensor->name);
                         }
                     }
                 }
             }
+            if ((new_type == GGML_TYPE_IQ2_XXS ||
+                 new_type == GGML_TYPE_IQ1_S   ||
+                (new_type == GGML_TYPE_IQ1_M && strcmp(tensor->name, "token_embd.weight") && strcmp(tensor->name, "output.weight"))) && !imatrix) {
+                LLAMA_LOG_INFO("\n\n============================================================\n");
+                LLAMA_LOG_INFO("Missing importance matrix for tensor %s in a very low-bit quantization\n", tensor->name);
+                LLAMA_LOG_INFO("The result will be garbage, so using GGML_TYPE_Q2_K\n");
+                LLAMA_LOG_INFO("============================================================\n\n");
+                new_type = GGML_TYPE_Q2_K;
+                //throw std::runtime_error(format("Missing importance matrix for tensor %s in a very low-bit quantization", tensor->name));
+            }
+
+            if ((new_type == GGML_TYPE_IQ2_XS  ||
+                 new_type == GGML_TYPE_IQ2_S   ||
+                (new_type == GGML_TYPE_Q2_K && params->ftype == LLAMA_FTYPE_MOSTLY_Q2_K_S && strcmp(tensor->name, "token_embd.weight") != 0)) && !imatrix) {
+                LLAMA_LOG_INFO("\n\n============================================================\n");
+                LLAMA_LOG_INFO("Missing importance matrix for tensor %s in a very low-bit quantization\n", tensor->name);
+                LLAMA_LOG_INFO("The result will be garbage, so using GGML_TYPE_Q3_K\n");
+                LLAMA_LOG_INFO("============================================================\n\n");
+                new_type = GGML_TYPE_Q3_K;
+            }
+
             if ((new_type == GGML_TYPE_IQ2_XXS ||
                  new_type == GGML_TYPE_IQ2_XS  ||
                  new_type == GGML_TYPE_IQ2_S   ||
