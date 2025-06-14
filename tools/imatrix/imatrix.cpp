@@ -239,6 +239,10 @@ void IMatrixCollector::save_imatrix(int ncall) const {
     int n_entries = 0;
     std::vector<std::string> to_store;
 
+    // Retrieve the REQUIRED_GOOD_EXPERT_PERCENTAGE from the environment
+    const char* required_good_expert_percentage_env_value = getenv("REQUIRED_GOOD_EXPERT_PERCENTAGE");
+    double required_good_expert_percentage = required_good_expert_percentage_env_value ? std::clamp(std::stod(required_good_expert_percentage_env_value), 0.0, 100.0) : 95.0;
+
     bool is_first = true; // for printing
     for (const auto & kv : m_stats) {
         const int n_all = kv.second.counts.size();
@@ -279,8 +283,10 @@ void IMatrixCollector::save_imatrix(int ncall) const {
                     }
                     if (nz_i > 0) bad_experts.push_back(i);
                 }
-                LOG_WRN("%s: %d out of %d experts are missing data\n", __func__, int(bad_experts.size()), kv.second.n_as);
-                if (bad_experts.size() < round(kv.second.n_as * 0.05)) {
+                size_t required_good_experts = round((kv.second.n_as * required_good_expert_percentage) / 100.0);
+                size_t good_experts = kv.second.n_as - bad_experts.size();
+                LOG_WRN("%s: %d out of %d experts are missing data - %ld out of %ld required\n", __func__, int(bad_experts.size()), kv.second.n_as, good_experts, required_good_experts);
+                if (bad_experts.size() < required_good_experts) {
                     LOG_WRN("%s: %d out of %d experts are missing data - storing but be aware\n", __func__, int(bad_experts.size()), kv.second.n_as);
                     store_it = true;
                     for (auto i : bad_experts) {
