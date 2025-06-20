@@ -1987,6 +1987,7 @@ void llama_vocab::impl::load(llama_model_loader & ml, const LLM_KV & kv) {
                     || t.first == "<|eom_id|>"
                     || t.first == "<EOT>"
                     || t.first == "_<EOT>"
+                    || t.first == "<|end_of_text|>"
                ) {
                 special_eog_ids.insert(t.second);
                 if ((id_to_token[t.second].attr & LLAMA_TOKEN_ATTR_CONTROL) == 0) {
@@ -2059,9 +2060,9 @@ void llama_vocab::impl::load(llama_model_loader & ml, const LLM_KV & kv) {
     //NOTE: Per token attributes are missing from the GGUF file.
     //TODO: Extract attributes from GGUF file.
     {
-        auto _contains_any = [] (const std::string & str, const std::vector<std::string> & substrs) -> bool {
+        auto _contains_any = [] (const std::string & str, const std::vector<std::string_view> & substrs) -> bool {
             for (const auto & substr : substrs) {
-                if (str.find(substr) < std::string::npos) {
+                if (str.find(substr) != std::string::npos) {
                     return true;
                 }
             }

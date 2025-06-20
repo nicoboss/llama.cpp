@@ -8,6 +8,8 @@
 #include "ggml-cpu-impl.h"
 #include "traits.h"
 
+#include "arch-fallback.h"
+
 #include <cmath>
 #include <cstring>
 #include <cassert>
@@ -83,7 +85,6 @@ void ggml_quantize_mat_q8_0_4x4_generic(const float * GGML_RESTRICT x, void * GG
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_quantize_mat_q8_0_4x4)
 
 void ggml_quantize_mat_q8_0_4x8_generic(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
     assert(QK8_0 == 32);
@@ -122,7 +123,6 @@ void ggml_quantize_mat_q8_0_4x8_generic(const float * GGML_RESTRICT x, void * GG
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_quantize_mat_q8_0_4x8)
 
 void ggml_quantize_mat_q8_K_4x8_generic(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
     assert(QK_K == 256);
@@ -174,7 +174,6 @@ void ggml_quantize_mat_q8_K_4x8_generic(const float * GGML_RESTRICT x, void * GG
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_quantize_mat_q8_K_4x8)
 
 } // extern "C"
 
@@ -244,7 +243,6 @@ void ggml_gemv_q4_0_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         for (int j = 0; j < ncols_interleaved; j++) s[x * ncols_interleaved + j] = sumf[j];
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemv_q4_0_4x4_q8_0)
 
 void ggml_gemv_q4_0_4x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -289,7 +287,6 @@ void ggml_gemv_q4_0_4x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         for (int j = 0; j < ncols_interleaved; j++) s[x * ncols_interleaved + j] = sumf[j];
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemv_q4_0_4x8_q8_0)
 
 void ggml_gemv_q4_0_8x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -336,7 +333,6 @@ void ggml_gemv_q4_0_8x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemv_q4_0_8x8_q8_0)
 
 void ggml_gemv_q4_K_8x8_q8_K_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK_K;
@@ -415,7 +411,6 @@ void ggml_gemv_q4_K_8x8_q8_K_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemv_q4_K_8x8_q8_K)
 
 void ggml_gemv_iq4_nl_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -462,7 +457,6 @@ void ggml_gemv_iq4_nl_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemv_iq4_nl_4x4_q8_0)
 
 void ggml_gemm_q4_0_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -519,7 +513,6 @@ void ggml_gemm_q4_0_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemm_q4_0_4x4_q8_0)
 
 void ggml_gemm_q4_0_4x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -574,7 +567,6 @@ void ggml_gemm_q4_0_4x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemm_q4_0_4x8_q8_0)
 
 void ggml_gemm_q4_0_8x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -629,7 +621,6 @@ void ggml_gemm_q4_0_8x8_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemm_q4_0_8x8_q8_0)
 
 void ggml_gemm_q4_K_8x8_q8_K_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK_K;
@@ -719,7 +710,6 @@ void ggml_gemm_q4_K_8x8_q8_K_generic(int n, float * GGML_RESTRICT s, size_t bs, 
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemm_q4_K_8x8_q8_K)
 
 void ggml_gemm_iq4_nl_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {
     const int qk = QK8_0;
@@ -776,7 +766,6 @@ void ggml_gemm_iq4_nl_4x4_q8_0_generic(int n, float * GGML_RESTRICT s, size_t bs
         }
     }
 }
-GGML_CPU_NATIVE_IMPL(ggml_gemm_iq4_nl_4x4_q8_0)
 
 } // extern "C"
 
@@ -1174,13 +1163,24 @@ template <typename BLOC_TYPE, int64_t INTER_SIZE, int64_t NB_COLS, ggml_type PAR
         // not realy a GGML_TYPE_Q8_0 but same size.
         switch (op->op) {
             case GGML_OP_MUL_MAT:
-                size = ggml_row_size(PARAM_TYPE, ggml_nelements(op->src[1]));
-                return true;
+                {
+                    size = ggml_row_size(PARAM_TYPE, ggml_nelements(op->src[1]));
+                    return true;
+                }
             case GGML_OP_MUL_MAT_ID:
-                size = ggml_row_size(PARAM_TYPE, ggml_nelements(op->src[1]));
-                size = GGML_PAD(size, sizeof(int64_t));  // + padding for next bloc.
-                size += sizeof(int64_t) * (1+op->src[0]->ne[2]) * op->src[1]->ne[2];
-                return true;
+                {
+                    size = ggml_row_size(PARAM_TYPE, ggml_nelements(op->src[1]));
+                    size = GGML_PAD(size, sizeof(int64_t)); // + padding for next bloc.
+
+                    const int64_t ne02 = op->src[0]->ne[2]; // n_as, n_expert
+                    const int64_t ne12 = op->src[1]->ne[2]; // n_tokens
+
+                    const size_t sizeof_mmid_row_mapping = sizeof(int64_t);
+
+                    size += sizeof_mmid_row_mapping*ne02*(ne12 + 1);
+
+                    return true;
+                }
             default:
                 // GGML_ABORT("fatal error");
                 break;
@@ -1316,14 +1316,17 @@ template <typename BLOC_TYPE, int64_t INTER_SIZE, int64_t NB_COLS, ggml_type PAR
             int32_t i2;
         };
 
-        GGML_ASSERT(params->wsize >= (GGML_PAD(nbw3, sizeof(int64_t)) + n_as * sizeof(int64_t) +
-                                      n_as * ne12 * sizeof(mmid_row_mapping)));
+        GGML_ASSERT(params->wsize >=
+                (GGML_PAD(nbw3, sizeof(int64_t)) +
+                 n_as*(ne12 + 1)*sizeof(mmid_row_mapping))
+                );
 
-        auto * wdata             = (char *)     params->wdata;
-        auto * wdata_src1_end    = (char *)     wdata + GGML_PAD(nbw3, sizeof(int64_t));
-        auto * matrix_row_counts = (int64_t *) (wdata_src1_end); // [n_as]
+        auto * wdata          = (char *)params->wdata;
+        auto * wdata_src1_end = (char *)wdata + GGML_PAD(nbw3, sizeof(int64_t));
 
-        struct mmid_row_mapping * matrix_rows = (struct mmid_row_mapping *) (matrix_row_counts + n_as);  // [n_as][ne12]
+        // total of [n_as][ne12 + 1] elemets of type mmid_row_mapping (2*int32_t = int64_t)
+        auto * matrix_row_counts = (int64_t *) (wdata_src1_end);                                        // [n_as]
+        struct mmid_row_mapping * matrix_rows = (struct mmid_row_mapping *) (matrix_row_counts + n_as); // [n_as][ne12]
 
         // src1: float32 => param type
         for (int64_t i12 = 0; i12 < ne12; ++i12) {
