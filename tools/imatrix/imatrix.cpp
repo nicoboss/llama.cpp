@@ -241,7 +241,7 @@ void IMatrixCollector::save_imatrix(int ncall) const {
 
     // Retrieve the REQUIRED_GOOD_EXPERT_PERCENTAGE from the environment
     const char* required_good_expert_percentage_env_value = getenv("REQUIRED_GOOD_EXPERT_PERCENTAGE");
-    double required_good_expert_percentage = required_good_expert_percentage_env_value ? std::clamp(std::stod(required_good_expert_percentage_env_value), 0.0, 100.0) : 95.0;
+    double required_good_expert_percentage = required_good_expert_percentage_env_value ? std::clamp(std::stod(required_good_expert_percentage_env_value), 0.0, 100.0) : 90.0;
 
     bool is_first = true; // for printing
     for (const auto & kv : m_stats) {
