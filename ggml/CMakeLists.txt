@@ -131,6 +131,7 @@ option(GGML_RVV              "ggml: enable rvv"              ON)
 option(GGML_RV_ZFH           "ggml: enable riscv zfh"        OFF)
 option(GGML_XTHEADVECTOR     "ggml: enable xtheadvector"     OFF)
 option(GGML_VXE              "ggml: enable vxe"              ON)
+option(GGML_NNPA             "ggml: enable nnpa"             ON)
 
 option(GGML_CPU_ALL_VARIANTS "ggml: build all variants of the CPU backend (requires GGML_BACKEND_DL)" OFF)
 set(GGML_CPU_ARM_ARCH        "" CACHE STRING "ggml: CPU architecture for ARM")
@@ -358,6 +359,13 @@ write_basic_package_version_file(
         ${CMAKE_CURRENT_BINARY_DIR}/ggml-version.cmake
     VERSION ${GGML_INSTALL_VERSION}
     COMPATIBILITY SameMajorVersion)
+
+target_compile_definitions(ggml-base PRIVATE
+    GGML_VERSION="${GGML_INSTALL_VERSION}"
+    GGML_COMMIT="${GGML_BUILD_COMMIT}"
+)
+message(STATUS "ggml version: ${GGML_INSTALL_VERSION}")
+message(STATUS "ggml commit:  ${GGML_BUILD_COMMIT}")
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ggml-config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/ggml-version.cmake
