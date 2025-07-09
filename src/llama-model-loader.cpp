@@ -711,6 +711,13 @@ llama_model_loader::llama_model_loader(
         use_mmap = false;
     }
 
+    if(getenv("DRYRUN")) {
+        if (use_mmap) {
+            LLAMA_LOG_WARN("%s: mmap is not supported for dry-run so it is now disabled\n", __func__);
+            use_mmap = false;
+        }
+    }
+
     this->use_mmap = use_mmap;
     this->check_tensors = check_tensors;
 }

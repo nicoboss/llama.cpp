@@ -33,6 +33,7 @@ struct Stats {
     std::vector<float> values;
     std::vector<int> counts;
     int ncall = 0;
+    int n_as = 1;
 };
 
 class IMatrixCollector {
@@ -127,10 +128,14 @@ bool IMatrixCollector::collect_imatrix(struct ggml_tensor * t, bool ask, void * 
         if (e.values.empty()) {
             e.values.resize(src1->ne[0]*n_as, 0);
             e.counts.resize(src1->ne[0]*n_as, 0);
+            e.n_as = n_as;
         }
         else if (e.values.size() != (size_t)src1->ne[0]*n_as) {
             LOG_ERR("%s: inconsistent size for %s (%d vs %d)\n", __func__, wname.c_str(), (int)e.values.size(), (int)src1->ne[0]*n_as);
             exit(1); //GGML_ABORT("fatal error");
+        }
+        else if (e.n_as != n_as) {
+            LOG_ERR("%s: inconsistent n_as for %s (%d vs %d)\n", __func__, wname.c_str(), e.n_as, n_as);
         }
         LOG_DBGV(2, "%s[%d]: %32s, %s, %5d x %5d, %d\n", __func__, m_last_call, wname.c_str(), ggml_op_name(t->op), (int)src1->ne[0], (int)src1->ne[2], (int)src1->type);
         // loop over all possible experts, regardless if they are used or not in the batch
@@ -173,23 +178,36 @@ bool IMatrixCollector::collect_imatrix(struct ggml_tensor * t, bool ask, void * 
     } else {
         auto & e = m_stats[wname];
         if (e.values.empty()) {
-            e.values.resize(src1->ne[0], 0);
-            e.counts.resize(src1->ne[0], 0);
+            if (src0->ne[3] > 1) {
+                LOG_ERR("Unsupported 4D tensor %s\n", wname.c_str());
+                exit(1);
+            }
+            // If we have a 3D tensor as it is the case for the attn_k_b and attn_v_b for DeepSeek MLA models,
+            // than we need to compute the imatrix for each head, and not just one imatrx for all heads.
+            // Hence, the storage we need is src0->ne[0]*src0->ne[2].
+            e.values.resize(src0->ne[0]*src0->ne[2], 0);
+            e.counts.resize(src0->ne[0]*src0->ne[2], 0);
         }
-        else if (e.values.size() != (size_t)src1->ne[0]) {
+        else if (e.values.size() != (size_t)(src0->ne[0]*src0->ne[2])) {
             LOG_ERR("%s: inconsistent size for %s (%d vs %d)\n", __func__, wname.c_str(), (int)e.values.size(), (int)src1->ne[0]);
             exit(1); //GGML_ABORT("fatal error");
         }
         ++e.ncall;
         LOG_DBGV(2, "%s[%d]: %32s, %s, %5d x %5d, %d\n", __func__, m_last_call, wname.c_str(), ggml_op_name(t->op), (int)src1->ne[0], (int)src1->ne[1], (int)src1->type);
-        for (int row = 0; row < (int)src1->ne[1]; ++row) {
-            const float * x = (const float *) (data + row * src1->nb[1]);
-            for (int j = 0; j < (int)src1->ne[0]; ++j) {
-                e.values[j] += x[j]*x[j];
-                e.counts[j]++;
-                if (!std::isfinite(e.values[j])) {
-                    LOG_ERR("%f detected in %s\n", e.values[j], wname.c_str());
-                    exit(1);
+        int rk2 = src1->ne[2]/src0->ne[2];
+        for (int i12 = 0; i12 < (int)src1->ne[2]; ++i12) {  // i.e., loop over attention heads for MLA models
+            int i02 = i12/rk2;
+            auto values = e.values.data() + i02*src0->ne[0];
+            auto counts = e.counts.data() + i02*src0->ne[0];
+            for (int i11 = 0; i11 < (int)src1->ne[1]; ++i11) {
+                const float * x = (const float *)((const char *)data + i11*src1->nb[1] + i12*src1->nb[2]);
+                for (int j = 0; j < (int)src1->ne[0]; ++j) {
+                    values[j] += x[j]*x[j];
+                    counts[j]++;
+                    if (!std::isfinite(values[j])) {
+                        LOG_ERR("%f detected in %s\n", e.values[j], wname.c_str());
+                        exit(1);
+                    }
                 }
             }
         }
@@ -221,6 +239,10 @@ void IMatrixCollector::save_imatrix(int ncall) const {
     int n_entries = 0;
     std::vector<std::string> to_store;
 
+    // Retrieve the REQUIRED_GOOD_EXPERT_PERCENTAGE from the environment
+    const char* required_good_expert_percentage_env_value = getenv("REQUIRED_GOOD_EXPERT_PERCENTAGE");
+    double required_good_expert_percentage = required_good_expert_percentage_env_value ? std::clamp(std::stod(required_good_expert_percentage_env_value), 0.0, 100.0) : 90.0;
+
     bool is_first = true; // for printing
     for (const auto & kv : m_stats) {
         const int n_all = kv.second.counts.size();
@@ -247,8 +269,40 @@ void IMatrixCollector::save_imatrix(int ncall) const {
         }
 
         if (n_zeros > 0) {
-            LOG_WRN("%s: entry '%40s' has partial data (%.2f%%) - skipping\n", __func__, kv.first.c_str(), 100.0f * (n_all - n_zeros) / n_all);
-            continue;
+            LOG_WRN("%s: entry '%40s' has partial data (%.2f%%)\n", __func__, kv.first.c_str(), 100.0f * (n_all - n_zeros) / n_all);
+            bool store_it = false;
+            if (kv.second.n_as > 1) {
+                int n_per_expert = n_all / kv.second.n_as;
+                std::vector<int> bad_experts;
+                bad_experts.reserve(kv.second.n_as);
+                for (int i = 0; i < kv.second.n_as; ++i) {
+                    auto counts = kv.second.counts.data() + i*n_per_expert;
+                    int nz_i = 0;
+                    for (int j = 0; j < n_per_expert; ++j) {
+                        if (counts[j] == 0) ++nz_i;
+                    }
+                    if (nz_i > 0) bad_experts.push_back(i);
+                }
+                size_t required_good_experts = round((kv.second.n_as * required_good_expert_percentage) / 100.0);
+                size_t good_experts = kv.second.n_as - bad_experts.size();
+                LOG_WRN("%s: %d out of %d experts are missing data - %ld out of %ld required\n", __func__, int(bad_experts.size()), kv.second.n_as, good_experts, required_good_experts);
+                if (good_experts >= required_good_experts) {
+                    LOG_WRN("%s: %d out of %d experts are missing data - storing but be aware\n", __func__, int(bad_experts.size()), kv.second.n_as);
+                    store_it = true;
+                    for (auto i : bad_experts) {
+                        auto counts = const_cast<int*>(kv.second.counts.data()) + i * n_per_expert;
+                        auto values = const_cast<float*>(kv.second.values.data()) + i * n_per_expert;
+                        for (int j = 0; j < n_per_expert; ++j) {
+                            counts[j] = 1;
+                            values[j] = 1;
+                        }
+                    }
+                }
+            }
+            if (!store_it) {
+                LOG_WRN("%s: Skipping expert with missing data!\n", __func__);
+                continue;
+            }
         }
 
         n_entries++;

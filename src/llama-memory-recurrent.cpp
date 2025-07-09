@@ -99,6 +99,10 @@ llama_memory_recurrent::llama_memory_recurrent(
 
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
         if (!buf) {
+            if(getenv("DRYRUN")) {
+                LLAMA_LOG_ERROR("%s: pretend allocating buffer for rs cache was successful due to dry-run being enabled\n", __func__);
+                return;
+            }
             throw std::runtime_error("failed to allocate buffer for rs cache");
         }
         ggml_backend_buffer_clear(buf, 0);

@@ -1966,6 +1966,11 @@ static const char * ggml_backend_cpu_buffer_type_get_name(ggml_backend_buffer_ty
 }
 
 static ggml_backend_buffer_t ggml_backend_cpu_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+    if(getenv("DRYRUN")) {
+		GGML_LOG_ERROR("[DRYRUN][CPU]: %ld\n", size);
+		return NULL;
+	}
+
     void * data = ggml_aligned_malloc(size);
 
     if (data == NULL) {

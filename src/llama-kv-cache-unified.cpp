@@ -135,6 +135,10 @@ llama_kv_cache_unified::llama_kv_cache_unified(
 
         ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
         if (!buf) {
+            if(getenv("DRYRUN")) {
+                LLAMA_LOG_ERROR("%s: pretend allocating buffer for kv cache was successful due to dry-run being enabled\n", __func__);
+                return;
+            }
             throw std::runtime_error("failed to allocate buffer for kv cache");
         }
 

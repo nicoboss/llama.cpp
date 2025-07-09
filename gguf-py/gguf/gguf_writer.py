@@ -238,6 +238,10 @@ class GGUFWriter:
             kv_bytes = bytearray()
 
             for key, val in kv_data.items():
+                if val.type != GGUFValueType.ARRAY or len (val.value) < 50:
+                    print("gguf serialising key ", key, "value", val)
+                else:
+                    print("gguf serialising key ", key, "value-suppressed")
                 kv_bytes += self._pack_val(key, GGUFValueType.STRING, add_vtype=False)
                 kv_bytes += self._pack_val(val.value, val.type, add_vtype=True, sub_type=val.sub_type)
 
