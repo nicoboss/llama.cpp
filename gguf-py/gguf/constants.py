@@ -2760,6 +2760,7 @@ class LlamaFileType(IntEnum):
     MOSTLY_TQ2_0         = 37  # except 1d tensors
 
     GUESSED              = 1024  # not specified in the model file
+    MOSTLY_SOURCE        = 1025  # not specified in the model file
 
 
 class GGUFEndian(IntEnum):

@@ -351,6 +351,16 @@ class ModelBase:
                         data_qtype = gguf.GGMLQuantizationType.TQ1_0
                     elif self.ftype == gguf.LlamaFileType.MOSTLY_TQ2_0:
                         data_qtype = gguf.GGMLQuantizationType.TQ2_0
+                    elif self.ftype == gguf.LlamaFileType.MOSTLY_SOURCE:
+                        if old_dtype == torch.float16:
+                            data_qtype = gguf.GGMLQuantizationType.F16
+                        elif old_dtype == torch.bfloat16:
+                            data_qtype = gguf.GGMLQuantizationType.BF16
+                        elif old_dtype == torch.float32:
+                            data_qtype = gguf.GGMLQuantizationType.F32
+                        else:
+                            logger.warning(f"Cannot find destination type matching {old_dtype}: Using F16")
+                            data_qtype = gguf.GGMLQuantizationType.F16
                     else:
                         raise ValueError(f"Unknown file type: {self.ftype.name}")
 
@@ -8164,8 +8174,8 @@ def parse_args() -> argparse.Namespace:
         help="path to write to; default: based on input. {ftype} will be replaced by the outtype.",
     )
     parser.add_argument(
-        "--outtype", type=str, choices=["f32", "f16", "bf16", "q8_0", "tq1_0", "tq2_0", "auto"], default="f16",
-        help="output format - use f32 for float32, f16 for float16, bf16 for bfloat16, q8_0 for Q8_0, tq1_0 or tq2_0 for ternary, and auto for the highest-fidelity 16-bit float type depending on the first loaded tensor type",
+        "--outtype", type=str, choices=["f32", "f16", "bf16", "q8_0", "tq1_0", "tq2_0", "source", "auto"], default="f16",
+        help="output format - use f32 for float32, f16 for float16, bf16 for bfloat16, q8_0 for Q8_0, tq1_0 or tq2_0 for ternary, source to keep it unchanged, and auto for the highest-fidelity 16-bit float type depending on the first loaded tensor type",
     )
     parser.add_argument(
         "--bigendian", action="store_true",
@@ -8308,6 +8318,7 @@ def main() -> None:
         "tq1_0": gguf.LlamaFileType.MOSTLY_TQ1_0,
         "tq2_0": gguf.LlamaFileType.MOSTLY_TQ2_0,
         "auto": gguf.LlamaFileType.GUESSED,
+        "source": gguf.LlamaFileType.MOSTLY_SOURCE,
     }
 
     is_split = args.split_max_tensors > 0 or args.split_max_size != "0"
