@@ -427,12 +427,25 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
 
     std::set<std::string> seen_args;
 
+    bool skipNext = false;
     for (int i = 1; i < argc; i++) {
         const std::string arg_prefix = "--";
 
         std::string arg = argv[i];
         if (arg.compare(0, arg_prefix.size(), arg_prefix) == 0) {
             std::replace(arg.begin(), arg.end(), '_', '-');
+        }
+        if (skipNext == true) {
+            skipNext = false;
+            continue;
+        }
+        if (arg == "--tensor-split") {
+            skipNext = true;
+            continue;
+        }
+        if (arg == "--rpc") {
+            skipNext = true;
+            continue;
         }
         if (arg_to_options.find(arg) == arg_to_options.end()) {
             throw std::invalid_argument(string_format("error: invalid argument: %s", arg.c_str()));
