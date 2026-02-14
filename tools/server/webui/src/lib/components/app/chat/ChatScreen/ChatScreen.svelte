@@ -21,6 +21,7 @@
 		chatStore,
 		errorDialog,
 		isLoading,
+		isChatStreaming,
 		isEditing,
 		getAddFilesHandler
 	} from '$lib/stores/chat.svelte';
@@ -34,6 +35,7 @@
 	import { modelsStore, modelOptions, selectedModelId } from '$lib/stores/models.svelte';
 	import { isFileTypeSupported, filterFilesByModalities } from '$lib/utils';
 	import { parseFilesToMessageExtras, processFilesToChatUploaded } from '$lib/utils/browser-only';
+	import { ErrorDialogType } from '$lib/enums';
 	import { onMount } from 'svelte';
 	import { fade, fly, slide } from 'svelte/transition';
 	import { Trash2, AlertTriangle, RefreshCw } from '@lucide/svelte';
@@ -81,7 +83,7 @@
 	let isServerLoading = $derived(serverLoading());
 	let hasPropsError = $derived(!!serverError());
 
-	let isCurrentConversationLoading = $derived(isLoading());
+	let isCurrentConversationLoading = $derived(isLoading() || isChatStreaming());
 
 	let isRouter = $derived(isRouterMode());
 
@@ -615,7 +617,7 @@
 	contextInfo={activeErrorDialog?.contextInfo}
 	onOpenChange={handleErrorDialogOpenChange}
 	open={Boolean(activeErrorDialog)}
-	type={activeErrorDialog?.type ?? 'server'}
+	type={(activeErrorDialog?.type as ErrorDialogType) ?? ErrorDialogType.SERVER}
 />
 
 <style>

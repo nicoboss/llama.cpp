@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import {
 		chatStore,
 		pendingEditMessageId,
@@ -61,8 +62,8 @@
 		assistantMessages: number;
 		messageTypes: string[];
 	} | null>(null);
-	let editedContent = $state(message.content);
-	let editedExtras = $state<DatabaseMessageExtra[]>(message.extra ? [...message.extra] : []);
+	let editedContent = $derived(message.content);
+	let editedExtras = $derived<DatabaseMessageExtra[]>(message.extra ? [...message.extra] : []);
 	let editedUploadedFiles = $state<ChatUploadedFile[]>([]);
 	let isEditing = $state(false);
 	let showDeleteDialog = $state(false);
@@ -119,7 +120,7 @@
 			const conversationDeleted = await removeSystemPromptPlaceholder(message.id);
 
 			if (conversationDeleted) {
-				goto('/');
+				goto(`${base}/`);
 			}
 
 			return;
@@ -220,7 +221,7 @@
 				const conversationDeleted = await removeSystemPromptPlaceholder(message.id);
 				isEditing = false;
 				if (conversationDeleted) {
-					goto('/');
+					goto(`${base}/`);
 				}
 				return;
 			}
