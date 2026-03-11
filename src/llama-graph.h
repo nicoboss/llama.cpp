@@ -810,12 +810,14 @@ struct llm_graph_context {
                  int64_t   n_expert_used,
          llm_ffn_op_type   type_op,
                     bool   norm_w,
-                    bool   scale_w,
                    float   w_scale,
             llama_expert_gating_func_type gating_op,
                      int   il,
              ggml_tensor * probs_in = nullptr,
-             ggml_tensor * gate_up_exps = nullptr) const;
+             ggml_tensor * gate_up_exps = nullptr,
+             ggml_tensor * up_exps_s = nullptr,
+             ggml_tensor * gate_exps_s = nullptr,
+             ggml_tensor * down_exps_s = nullptr) const;
 
     ggml_tensor * build_moe_ffn(
              ggml_tensor * cur,
@@ -832,13 +834,15 @@ struct llm_graph_context {
                  int64_t   n_expert_used,
          llm_ffn_op_type   type_op,
                     bool   norm_w,
-                    bool   scale_w,
                    float   w_scale,
             llama_expert_gating_func_type gating_op,
                      int   il,
              ggml_tensor * probs_in = nullptr,
              ggml_tensor * gate_up_exps = nullptr,
-             ggml_tensor * gate_up_exps_b = nullptr) const;
+             ggml_tensor * gate_up_exps_b = nullptr,
+             ggml_tensor * up_exps_s = nullptr,
+             ggml_tensor * gate_exps_s = nullptr,
+             ggml_tensor * down_exps_s = nullptr) const;
 
     //
     // inputs
