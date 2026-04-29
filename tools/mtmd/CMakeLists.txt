@@ -40,6 +40,7 @@ add_library(mtmd
             models/deepseekocr.cpp
             models/mobilenetv5.cpp
             models/youtuvl.cpp
+            models/yasa2.cpp
             )
 
 set_target_properties(mtmd PROPERTIES
@@ -79,6 +80,11 @@ install(TARGETS mtmd LIBRARY PUBLIC_HEADER)
 if (NOT MSVC)
     # for stb_image.h and miniaudio.h
     target_compile_options(mtmd PRIVATE -Wno-cast-qual)
+endif()
+
+if (ANDROID)
+    # miniaudio.h defines ma_android_sdk_version() without a prior prototype
+    target_compile_options(mtmd PRIVATE -Wno-missing-prototypes)
 endif()
 
 if (TARGET BUILD_INFO)
