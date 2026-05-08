@@ -66,6 +66,11 @@ export const SETTINGS_CHAT_SECTIONS: SettingsSection[] = [
 				type: SettingsFieldType.INPUT
 			},
 			{
+				key: SETTINGS_KEYS.SEND_ON_ENTER,
+				label: 'Send message on Enter',
+				type: SettingsFieldType.CHECKBOX
+			},
+			{
 				key: SETTINGS_KEYS.COPY_TEXT_ATTACHMENTS_AS_PLAIN_TEXT,
 				label: 'Copy text attachments as plain text',
 				type: SettingsFieldType.CHECKBOX
@@ -85,6 +90,22 @@ export const SETTINGS_CHAT_SECTIONS: SettingsSection[] = [
 				key: SETTINGS_KEYS.ASK_FOR_TITLE_CONFIRMATION,
 				label: 'Ask for confirmation before changing conversation title',
 				type: SettingsFieldType.CHECKBOX
+			},
+			{
+				key: SETTINGS_KEYS.TITLE_GENERATION_USE_FIRST_LINE,
+				label: 'Use first non-empty line for conversation title',
+				type: SettingsFieldType.CHECKBOX
+			},
+			{
+				key: SETTINGS_KEYS.TITLE_GENERATION_USE_LLM,
+				label: 'Use LLM to generate conversation title',
+				type: SettingsFieldType.CHECKBOX,
+				isExperimental: true
+			},
+			{
+				key: SETTINGS_KEYS.TITLE_GENERATION_PROMPT,
+				type: SettingsFieldType.TEXTAREA,
+				isExperimental: true
 			}
 		]
 	},
@@ -297,6 +318,11 @@ export const SETTINGS_CHAT_SECTIONS: SettingsSection[] = [
 		slug: 'developer',
 		icon: Code,
 		fields: [
+			{
+				key: SETTINGS_KEYS.PRE_ENCODE_CONVERSATION,
+				label: 'Pre-fill KV cache after response',
+				type: SettingsFieldType.CHECKBOX
+			},
 			{
 				key: SETTINGS_KEYS.DISABLE_REASONING_PARSING,
 				label: 'Disable reasoning content parsing',
