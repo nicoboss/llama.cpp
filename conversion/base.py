@@ -876,6 +876,16 @@ class ModelBase:
                         data_qtype = gguf.GGMLQuantizationType.TQ1_0
                     elif self.ftype == gguf.LlamaFileType.MOSTLY_TQ2_0:
                         data_qtype = gguf.GGMLQuantizationType.TQ2_0
+                    elif self.ftype == gguf.LlamaFileType.MOSTLY_SOURCE:
+                        if old_dtype == torch.float16:
+                            data_qtype = gguf.GGMLQuantizationType.F16
+                        elif old_dtype == torch.bfloat16:
+                            data_qtype = gguf.GGMLQuantizationType.BF16
+                        elif old_dtype == torch.float32:
+                            data_qtype = gguf.GGMLQuantizationType.F32
+                        else:
+                            logger.warning(f"Cannot find destination type matching {old_dtype}: Using F16")
+                            data_qtype = gguf.GGMLQuantizationType.F16
                     else:
                         raise ValueError(f"Unknown file type: {self.ftype.name}")
 
