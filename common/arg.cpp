@@ -584,10 +584,10 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
                     continue;
                 }
             } catch (std::exception & e) {
-                throw std::invalid_argument(string_format(
+                LOG_WRN(
                     "error while handling argument \"%s\": %s\n\n"
                     "usage:\n%s\n\nto show complete usage, run with -h",
-                    arg.c_str(), e.what(), opt.to_string().c_str()));
+                    arg.c_str(), e.what(), opt.to_string().c_str());
             }
         }
     };
