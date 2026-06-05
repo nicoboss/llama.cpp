@@ -201,7 +201,7 @@ static int load_imatrix(const std::string & imatrix_file, std::vector<std::strin
                 const float count = (float) entry.counts[j];
                 if (count > 0.0f) {
                     for (int64_t i = 0; i < ne0; ++i) {
-                        e[j*ne0 + i] = entry.sums[j*ne0 + i] / count;
+                        e[j*ne0 + i] = (entry.sums[j*ne0 + i] + 1.0f) / (count + 1.0f);
                     }
                 } else {
                     for (int64_t i = 0; i < ne0; ++i) {
