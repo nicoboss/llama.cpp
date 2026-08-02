@@ -812,7 +812,7 @@ llama_model_loader::llama_model_loader(
     }
 
     if(getenv("DRYRUN")) {
-        if (this->use_mmap = false;) {
+        if (this->use_mmap == true) {
             LLAMA_LOG_WARN("%s: mmap is not supported for dry-run so it is now disabled\n", __func__);
             this->use_mmap = false;
         }
