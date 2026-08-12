@@ -1390,8 +1390,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"--version"},
         "show version and build info",
         [](common_params &) {
-            fprintf(stderr, "version: %d (%s)\n", llama_build_number(), llama_commit());
-            fprintf(stderr, "built with %s for %s\n", llama_compiler(), llama_build_target());
+            llama_print_build_info(llama_version());
             exit(0);
         }
     ));
@@ -2605,14 +2604,16 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_env("LLAMA_ARG_DIO"));
     add_opt(common_arg(
         {"-lm", "--load-mode"}, "MODE",
-        "model loading mode (default: mmap)\n"
+        "model loading mode (default: auto)\n"
+        "- auto: mmap, unless a device does not support it\n"
         "- none: no special loading mode\n"
         "- mmap: memory-map model (if mmap disabled, slower load but may reduce pageouts if not using mlock)\n"
         "- mlock: force system to keep model in RAM rather than swapping or compressing\n"
         "- mmap+mlock: mmap + force system to keep model in RAM rather than swapping or compressing\n"
         "- dio: use DirectIO if available\n",
         [](common_params & params, const std::string & value) {
-            /**/ if (value == "none")       { params.load_mode = LLAMA_LOAD_MODE_NONE;       }
+            /**/ if (value == "auto")       { params.load_mode = LLAMA_LOAD_MODE_AUTO;       }
+            else if (value == "none")       { params.load_mode = LLAMA_LOAD_MODE_NONE;       }
             else if (value == "mmap")       { params.load_mode = LLAMA_LOAD_MODE_MMAP;       }
             else if (value == "mlock")      { params.load_mode = LLAMA_LOAD_MODE_MLOCK;      }
             else if (value == "mmap+mlock") { params.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK; }
