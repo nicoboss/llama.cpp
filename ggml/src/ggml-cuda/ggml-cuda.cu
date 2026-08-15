@@ -908,12 +908,19 @@ static size_t ggml_backend_cuda_buffer_type_get_alignment(ggml_backend_buffer_ty
     GGML_UNUSED(buft);
 }
 
-static size_t ggml_backend_cuda_buffer_type_get_alloc_size(ggml_backend_buffer_type_t buft, const ggml_tensor * tensor) {
-    ggml_backend_cuda_buffer_type_context * buft_ctx = (ggml_backend_cuda_buffer_type_context *) buft->context;
+static size_t ggml_backend_cuda_buffer_type_get_alloc_size(ggml_backend_buffer_type_t buft, const struct ggml_tensor * tensor) {
+    // 1. Safely handle nullptr context
+    int device = 0;
+    if (buft && buft->context) {
+        auto * buft_ctx = (ggml_backend_cuda_buffer_type_context *) buft->context;
+        device = buft_ctx->device;
+    }
 
+    // 2. Pass the resolved integer device ID instead of dereferencing buft_ctx directly
     size_t size = tensor->op == GGML_OP_FLASH_ATTN_EXT
-        ? ggml_cuda_flash_attn_ext_get_alloc_size(buft_ctx->device, tensor)
+        ? ggml_cuda_flash_attn_ext_get_alloc_size(device, tensor)
         : ggml_nbytes(tensor);
+
     int64_t ne0 = tensor->ne[0];
 
     if (ggml_is_quantized(tensor->type)) {
@@ -1271,10 +1278,6 @@ static bool ggml_backend_buft_is_cuda_host(ggml_backend_buffer_type_t buft) {
     return buft->iface.get_name == ggml_backend_cuda_host_buffer_type_name;
 }
 
-static void ggml_backend_cuda_host_buffer_free_buffer(ggml_backend_buffer_t buffer) {
-    CUDA_CHECK(cudaFreeHost(buffer->context));
-}
-
 static void * ggml_cuda_host_malloc(size_t size) {
     if (getenv("GGML_CUDA_NO_PINNED") != nullptr) {
         return nullptr;
@@ -1293,38 +1296,73 @@ static void * ggml_cuda_host_malloc(size_t size) {
     return ptr;
 }
 
-static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
-    if(getenv("DRYRUN")) {
-        GGML_LOG_ERROR("[DRYRUN][PINNED]: %ld\n", size);
-        return nullptr;
-    }
-    void * ptr = ggml_cuda_host_malloc(size);
+static void * ggml_backend_cuda_host_buffer_get_base(ggml_backend_buffer_t buffer) {
+    auto * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
+    return ctx ? ctx->dev_ptr : nullptr;
+}
 
-    if (ptr == nullptr) {
-        // fallback to cpu buffer
+static void ggml_backend_cuda_host_buffer_free_buffer(ggml_backend_buffer_t buffer) {
+    auto * ctx = (ggml_backend_cuda_buffer_context *) buffer->context;
+    if (ctx) {
+        if (ctx->dev_ptr) {
+            cudaFreeHost(ctx->dev_ptr);
+            ctx->dev_ptr = nullptr; // Prevents ~ggml_backend_cuda_buffer_context from calling cudaFree()
+        }
+        delete ctx;
+    }
+}
+
+static ggml_backend_buffer_t ggml_backend_cuda_host_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+    void * ptr = nullptr;
+    
+    // Allocate Pinned Host RAM mapped directly into CUDA address space (Zero-Copy)
+    cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostAllocMapped | cudaHostAllocPortable);
+
+    if (err != cudaSuccess || ptr == nullptr) {
+        GGML_LOG_ERROR("[RPC CUDA Host] cudaHostAlloc failed for size %zu: %s\n", 
+                        size, cudaGetErrorString(err));
         return ggml_backend_buft_alloc_buffer(ggml_backend_cpu_buffer_type(), size);
     }
 
-    ggml_backend_buffer_t buffer = ggml_backend_cpu_buffer_from_ptr(ptr, size);
-    buffer->buft = buft;
-    buffer->iface.free_buffer = ggml_backend_cuda_host_buffer_free_buffer;
+    // Pass (device_id, host_ptr) into standard CUDA context struct
+    auto * ctx = new ggml_backend_cuda_buffer_context(0, ptr);
 
-    return buffer;
+    // Override interface methods with custom host-pinned handlers
+    static struct ggml_backend_buffer_i cuda_host_interface = ggml_backend_cuda_buffer_interface;
+    cuda_host_interface.get_base = ggml_backend_cuda_host_buffer_get_base;
+    cuda_host_interface.free_buffer = ggml_backend_cuda_host_buffer_free_buffer;
+
+    return ggml_backend_buffer_init(buft, cuda_host_interface, ctx, size);
+}
+
+
+static bool ggml_backend_cuda_host_buffer_type_is_host(ggml_backend_buffer_type_t buft) {
+    GGML_UNUSED(buft);
+    return false; // Tells GGML scheduler this buffer is CUDA execution capable
+}
+
+static size_t ggml_backend_cuda_host_buffer_type_get_alignment(ggml_backend_buffer_type_t buft) {
+    GGML_UNUSED(buft);
+    return 512; // Standard 512-byte CUDA/CPU cache line alignment
 }
 
 ggml_backend_buffer_type_t ggml_backend_cuda_host_buffer_type() {
     static struct ggml_backend_buffer_type ggml_backend_cuda_buffer_type_host = {
-        /* .iface    = */ {
+        /* .iface   = */ {
             /* .get_name         = */ ggml_backend_cuda_host_buffer_type_name,
             /* .alloc_buffer     = */ ggml_backend_cuda_host_buffer_type_alloc_buffer,
-            /* .get_alignment    = */ ggml_backend_cpu_buffer_type()->iface.get_alignment,
-            /* .get_max_size     = */ NULL, // defaults to SIZE_MAX
-            /* .get_alloc_size   = */ ggml_backend_cpu_buffer_type()->iface.get_alloc_size,
-            /* .is_host          = */ ggml_backend_cpu_buffer_type()->iface.is_host,
+            /* .get_alignment    = */ ggml_backend_cuda_host_buffer_type_get_alignment,
+            /* .get_max_size     = */ NULL,
+            /* .get_alloc_size   = */ ggml_backend_cuda_buffer_type_get_alloc_size,
+            /* .is_host          = */ ggml_backend_cuda_host_buffer_type_is_host,
         },
-        /* .device   = */ ggml_backend_reg_dev_get(ggml_backend_cuda_reg(), 0),
-        /* .context  = */ nullptr,
+        /* .device  = */ nullptr,
+        /* .context = */ nullptr, // Now safe because get_alloc_size handles nullptr context!
     };
+
+    if (ggml_backend_cuda_buffer_type_host.device == nullptr) {
+        ggml_backend_cuda_buffer_type_host.device = ggml_backend_reg_dev_get(ggml_backend_cuda_reg(), 0);
+    }
 
     return &ggml_backend_cuda_buffer_type_host;
 }
@@ -4766,45 +4804,22 @@ static bool ggml_backend_cuda_get_available_uma_memory(long * available_memory_k
 }
 #endif // defined(__linux__)
 
+#include <sys/sysinfo.h>
+
+// Replace the function assigned to .get_memory with this:
 static void ggml_backend_cuda_device_get_memory(ggml_backend_dev_t dev, size_t * free, size_t * total) {
-    ggml_backend_cuda_device_context * ctx = (ggml_backend_cuda_device_context *)dev->context;
-    ggml_cuda_set_device(ctx->device);
-    cudaError_t err = cudaMemGetInfo(free, total);
-    if (err != cudaSuccess) {
-        (void)cudaGetLastError();
-        GGML_LOG_WARN("%s: cudaMemGetInfo failed (%s), returning 0/0\n", __func__, cudaGetErrorString(err));
-        *free = 0;
-        *total = 0;
+    GGML_UNUSED(dev);
+
+    struct sysinfo sys_info;
+    if (sysinfo(&sys_info) == 0) {
+        *free  = (size_t) sys_info.freeram * sys_info.mem_unit;
+        *total = (size_t) sys_info.totalram * sys_info.mem_unit;
         return;
     }
 
-// ref: https://github.com/ggml-org/llama.cpp/pull/17368
-#if defined(__linux__)
-    // Check if this is a UMA (Unified Memory Architecture) system
-    cudaDeviceProp prop;
-    CUDA_CHECK(cudaGetDeviceProperties(&prop, ggml_cuda_get_physical_device(ctx->device)));
-
-    // Check if UMA is explicitly enabled via environment variable
-    bool uma_env = getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY") != nullptr;
-    bool is_uma = prop.integrated > 0 || uma_env;
-
-    if (is_uma) {
-        // For UMA systems (like DGX Spark), use system memory info
-        long available_memory_kb = 0;
-        long free_swap_kb = 0;
-
-        if (ggml_backend_cuda_get_available_uma_memory(&available_memory_kb, &free_swap_kb) && available_memory_kb > 0) {
-            *free = (size_t)available_memory_kb * 1024;
-        } else {
-            GGML_LOG_ERROR("%s: /proc/meminfo reading failed, using cudaMemGetInfo\n", __func__);
-        }
-    }
-#endif // defined(__linux__)
-
-    // virtual devices sharing one physical GPU share its memory pool; split it between them
-    const int share_count = ggml_cuda_physical_device_share_count(ctx->device);
-    *free  /= share_count;
-    *total /= share_count;
+    // Fallback: Report 256 GB
+    *free  = (size_t) 256 * 1024 * 1024 * 1024;
+    *total = (size_t) 256 * 1024 * 1024 * 1024;
 }
 
 static enum ggml_backend_dev_type ggml_backend_cuda_device_get_type(ggml_backend_dev_t dev) {
@@ -4851,7 +4866,7 @@ static ggml_backend_t ggml_backend_cuda_device_init_backend(ggml_backend_dev_t d
 
 static ggml_backend_buffer_type_t ggml_backend_cuda_device_get_buffer_type(ggml_backend_dev_t dev) {
     ggml_backend_cuda_device_context * ctx = (ggml_backend_cuda_device_context *)dev->context;
-    return ggml_backend_cuda_buffer_type(ctx->device);
+    return ggml_backend_cuda_host_buffer_type();
 }
 
 static ggml_backend_buffer_type_t ggml_backend_cuda_device_get_host_buffer_type(ggml_backend_dev_t dev) {
