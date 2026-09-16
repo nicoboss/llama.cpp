@@ -1786,7 +1786,7 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
                     throw std::runtime_error(format("unable to allocate %s buffer", ggml_backend_buft_name(buft)));
                 }
             }
-            if (use_mlock && ggml_backend_buffer_is_host(buf)) {
+            if (use_mlock && buf != nullptr && ggml_backend_buffer_is_host(buf)) {
                 pimpl->mlock_bufs.emplace_back(new llama_mlock);
                 auto & mlock_buf = pimpl->mlock_bufs.back();
                 mlock_buf->init   (ggml_backend_buffer_get_base(buf));
@@ -1845,7 +1845,8 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
     if (!ml.use_mmap) {
         std::stable_partition(ctx_buf_maps.begin(), ctx_buf_maps.end(), [](const auto & ctx_buf_map) {
             const auto & buf_map = ctx_buf_map.second;
-            return !buf_map.empty() && !ggml_backend_buffer_is_host(buf_map.begin()->second);
+            ggml_backend_buffer_t buf = buf_map.empty() ? nullptr : buf_map.begin()->second;
+            return buf != nullptr && !ggml_backend_buffer_is_host(buf);
         });
     }
 
