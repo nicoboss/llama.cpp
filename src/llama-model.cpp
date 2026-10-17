@@ -2026,31 +2026,19 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
 
     // without mmap, load non-host buffers first: their tensors go through a staging buffer, which is cheapest while the fewest weights are resident
     if (!ml.use_mmap) {
-<<<<<<< HEAD
-        std::stable_partition(ctx_buf_maps.begin(), ctx_buf_maps.end(), [](const auto & ctx_buf_map) {
-            const auto & buf_map = ctx_buf_map.second;
-            ggml_backend_buffer_t buf = buf_map.empty() ? nullptr : buf_map.begin()->second;
-            return buf != nullptr && !ggml_backend_buffer_is_host(buf);
-=======
         std::stable_partition(ctx_bufs.begin(), ctx_bufs.end(), [](const auto & x) {
             const auto & bufs = x.second;
-            return !bufs.empty() && !ggml_backend_buffer_is_host(bufs[0]);
->>>>>>> ggml/master
+            ggml_backend_buffer_t buf = bufs.empty() ? nullptr : bufs[0];
+            return buf != nullptr && !ggml_backend_buffer_is_host(buf);
         });
     }
 
     // load tensor data
-<<<<<<< HEAD
-    if(!getenv("DRYRUN")) {
-        for (auto & [ctx, buf_map] : ctx_buf_maps) {
-            if (!ml.load_all_data(ctx, buf_map, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
+    if (!getenv("DRYRUN")) {
+        for (auto & [ctx, bufs] : ctx_bufs) {
+            if (!ml.load_all_data(ctx, bufs, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
                 return false;
             }
-=======
-    for (auto & [ctx, bufs] : ctx_bufs) {
-        if (!ml.load_all_data(ctx, bufs, use_mlock ? &pimpl->mlock_mmaps : NULL, params.progress_callback, params.progress_callback_user_data)) {
-            return false;
->>>>>>> ggml/master
         }
     }
 
